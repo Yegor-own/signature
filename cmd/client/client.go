@@ -11,7 +11,11 @@ import (
 func readSock(conn net.Conn) {
 	for {
 		buf := make([]byte, 256)
-		readedLn, _ := conn.Read(buf)
+		readedLn, err := conn.Read(buf)
+		if err != nil {
+			fmt.Println(err)
+		}
+
 		if readedLn > 0 {
 			fmt.Println(string(buf))
 		}
@@ -21,7 +25,15 @@ func readSock(conn net.Conn) {
 func readConsole(ch chan string) {
 	for {
 		fmt.Println(">")
-		line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+		line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		if err != nil {
+			fmt.Println(err)
+		}
+		if len(line) > 256 {
+			fmt.Println("string is too long, limit is 256 symbols")
+			continue
+		}
+
 		out := line[:len(line)-1]
 		ch <- out
 	}
@@ -31,7 +43,10 @@ func main() {
 	ch := make(chan string)
 	defer close(ch)
 
-	conn, _ := net.Dial("tcp", "localhost:8081")
+	conn, err := net.Dial("tcp", "localhost:8081")
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	go readConsole(ch)
 	go readSock(conn)
@@ -50,5 +65,8 @@ func main() {
 	}
 
 	fmt.Println("Finished...")
-	conn.Close()
+	err = conn.Close()
+	if err != nil {
+		fmt.Println(err)
+	}
 }

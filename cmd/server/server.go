@@ -25,10 +25,13 @@ func process(conns map[int]net.Conn, n int) {
 
 		message := string(buf[:readedLn])
 
-		_, err = fmt.Sscanf(message, "%d", &clientNum)
+		ln, err := fmt.Sscanf(message, "%d", &clientNum)
 		if err != nil {
 			conn.Write([]byte(err.Error()))
 			continue
+		}
+		if ln > 256 {
+			fmt.Println("msg is too long, limit is 256")
 		}
 
 		pos := strings.Index(message, " ")
@@ -40,10 +43,13 @@ func process(conns map[int]net.Conn, n int) {
 				continue
 			}
 			outBuf := []byte(fmt.Sprintf("%d >> %s\n", clientNum, outMsg))
-			_, err = conn.Write(outBuf)
+			ln, err = conn.Write(outBuf)
 			if err != nil {
 				fmt.Println("Server: ", err)
 				break
+			}
+			if ln > 256 {
+				fmt.Println("line is too long, limit is 256")
 			}
 		}
 	}
@@ -51,12 +57,20 @@ func process(conns map[int]net.Conn, n int) {
 
 func main() {
 	fmt.Println("Server starting...")
-	ln, _ := net.Listen("tcp", ":8081")
+	ln, err := net.Listen("tcp", ":8081")
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	conns := make(map[int]net.Conn, 1024)
 	i := 0
 
 	for {
-		conn, _ := ln.Accept()
+		conn, err := ln.Accept()
+		if err != nil {
+			fmt.Println(err)
+		}
+
 		conns[i] = conn
 		go process(conns, i)
 		i++
