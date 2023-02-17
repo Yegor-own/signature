@@ -5,6 +5,7 @@ import (
 	"github.com/Yegor-own/signature/config"
 	"github.com/gorilla/websocket"
 	"log"
+	"net/http"
 	"time"
 )
 
@@ -38,4 +39,61 @@ func (c *Client) readPump() {
 		message = bytes.TrimSpace(bytes.Replace(message, config.NewLine, config.Space, -1))
 		c.hub.broadcast <- message
 	}
+}
+
+func (c *Client) writePump() {
+	ticker := time.NewTicker(config.PingPerioud)
+	defer func() {
+		ticker.Stop()
+		c.conn.Close()
+	}()
+
+	for {
+		select {
+		case message, ok := <-c.send:
+			c.conn.SetWriteDeadline(time.Now().Add(config.WriteWait))
+			if !ok {
+				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
+			writeConn, err := c.conn.NextWriter(websocket.TextMessage)
+			if err != nil {
+				return
+			}
+			writeConn.Write(message)
+
+			n := len(c.send)
+			for i := 0; i < n; i++ {
+				writeConn.Write(config.NewLine)
+				writeConn.Write(<-c.send)
+			}
+
+			if err = writeConn.Close(); err != nil {
+				return
+			}
+		case <-ticker.C:
+			c.conn.SetWriteDeadline(time.Now().Add(config.WriteWait))
+			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
+		}
+	}
+}
+
+func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
+	conn, err := config.Upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	client := &Client{
+		hub:  hub,
+		conn: conn,
+		send: make(chan []byte, 256),
+	}
+
+	client.hub.register <- client
+
+	go client.writePump()
+	go client.readPump()
 }
