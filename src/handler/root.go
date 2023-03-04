@@ -1,11 +1,11 @@
-package repo
+package handler
 
 import (
 	"log"
 	"net/http"
 )
 
-func HomeHandler(writer http.ResponseWriter, request *http.Request) {
+func RootHandler(writer http.ResponseWriter, request *http.Request) {
 	log.Println(request.URL)
 	if request.URL.Path != "/" {
 		http.Error(writer, "Not found", http.StatusNotFound)
@@ -16,5 +16,5 @@ func HomeHandler(writer http.ResponseWriter, request *http.Request) {
 		http.Error(writer, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	http.ServeFile(writer, request, "../../../web/index.html")
+	http.ServeFile(writer, request, "../template/root.html")
 }

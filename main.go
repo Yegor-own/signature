@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/Yegor-own/signature/internal/entity"
-	"github.com/Yegor-own/signature/internal/repo"
+	"github.com/Yegor-own/signature/src/entity"
+	"github.com/Yegor-own/signature/src/handler"
 	"log"
 	"net/http"
 )
@@ -14,7 +14,7 @@ func main() {
 	hub := entity.NewHub()
 	go hub.Run()
 
-	http.HandleFunc("/", repo.HomeHandler)
+	http.HandleFunc("/", handler.RootHandler)
 
 	http.HandleFunc("/ws", func(writer http.ResponseWriter, request *http.Request) {
 		entity.ServeWS(hub, writer, request)

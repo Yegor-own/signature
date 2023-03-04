@@ -2,7 +2,7 @@ package entity
 
 import (
 	"bytes"
-	"github.com/Yegor-own/signature/config"
+	"github.com/Yegor-own/signature/src/conf"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
@@ -21,10 +21,10 @@ func (c *Client) readPump() {
 		c.conn.Close()
 	}()
 
-	c.conn.SetReadLimit(config.MaxMessageSize)
-	c.conn.SetReadDeadline(time.Now().Add(config.ReadWait))
+	c.conn.SetReadLimit(conf.MaxMessageSize)
+	c.conn.SetReadDeadline(time.Now().Add(conf.ReadWait))
 	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(config.ReadWait))
+		c.conn.SetReadDeadline(time.Now().Add(conf.ReadWait))
 		return nil
 	})
 
@@ -36,13 +36,13 @@ func (c *Client) readPump() {
 			}
 			break
 		}
-		message = bytes.TrimSpace(bytes.Replace(message, config.NewLine, config.Space, -1))
+		message = bytes.TrimSpace(bytes.Replace(message, conf.NewLine, conf.Space, -1))
 		c.hub.broadcast <- message
 	}
 }
 
 func (c *Client) writePump() {
-	ticker := time.NewTicker(config.PingPerioud)
+	ticker := time.NewTicker(conf.PingPerioud)
 	defer func() {
 		ticker.Stop()
 		c.conn.Close()
@@ -51,7 +51,7 @@ func (c *Client) writePump() {
 	for {
 		select {
 		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(config.WriteWait))
+			c.conn.SetWriteDeadline(time.Now().Add(conf.WriteWait))
 			if !ok {
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
@@ -64,7 +64,7 @@ func (c *Client) writePump() {
 
 			n := len(c.send)
 			for i := 0; i < n; i++ {
-				writeConn.Write(config.NewLine)
+				writeConn.Write(conf.NewLine)
 				writeConn.Write(<-c.send)
 			}
 
@@ -72,7 +72,7 @@ func (c *Client) writePump() {
 				return
 			}
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(config.WriteWait))
+			c.conn.SetWriteDeadline(time.Now().Add(conf.WriteWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
@@ -81,7 +81,7 @@ func (c *Client) writePump() {
 }
 
 func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
-	conn, err := config.Upgrader.Upgrade(w, r, nil)
+	conn, err := conf.Upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
