@@ -10,9 +10,10 @@ import (
 )
 
 type Client struct {
-	hub  *Hub
-	conn *websocket.Conn
-	send chan []byte
+	hub   *Hub
+	conn  *websocket.Conn
+	send  chan []byte
+	login string
 }
 
 func (c *Client) readPump() {
@@ -37,7 +38,7 @@ func (c *Client) readPump() {
 			break
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, conf.NewLine, conf.Space, -1))
-		c.hub.broadcast <- message
+		c.hub.broadcast <- []byte(c.login + " " + string(message))
 	}
 }
 

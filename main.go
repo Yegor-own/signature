@@ -20,21 +20,7 @@ func main() {
 		entity.ServeWS(hub, writer, request)
 	})
 
-	go func() {
-		err := http.ListenAndServe(":8080", nil)
-		if err != nil {
-			log.Fatalln("Listen and serve:", err)
-		}
-	}()
-
-	go func() {
-		err := http.ListenAndServe(":8081", nil)
-		if err != nil {
-			log.Fatalln("Listen and serve:", err)
-		}
-	}()
-
-	err := http.ListenAndServe(":8082", nil)
+	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
 		log.Fatalln("Listen and serve:", err)
 	}
