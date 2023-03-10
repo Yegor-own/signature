@@ -1,40 +1,52 @@
 package entity
 
+import (
+	"log"
+	"net/http"
+	"sync"
+
+	"github.com/Yegor-own/signature/internal/config"
+)
+
 type Hub struct {
-	clients    map[*Client]bool
-	broadcast  chan []byte
-	register   chan *Client
-	unregister chan *Client
+	clients map[*Client]bool
+	sync.RWMutex
+	broadcast chan []byte
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		clients:    make(map[*Client]bool),
-		broadcast:  make(chan []byte),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
+		clients:   make(map[*Client]bool, 0),
+		broadcast: make(chan []byte),
 	}
 }
 
-func (h *Hub) Run() {
-	for {
-		select {
-		case client := <-h.register:
-			h.clients[client] = true
-		case client := <-h.unregister:
-			if _, ok := h.clients[client]; ok {
-				delete(h.clients, client)
-				close(client.send)
-			}
-		case msg := <-h.broadcast:
-			for client := range h.clients {
-				select {
-				case client.send <- msg:
-				default:
-					close(client.send)
-					delete(h.clients, client)
-				}
-			}
-		}
+func (hub *Hub) AddClient(client *Client) {
+	hub.Lock()
+	defer hub.Unlock()
+
+	hub.clients[client] = true
+}
+
+func (hub *Hub) DeleteClient(client *Client) {
+	hub.Lock()
+	defer hub.Unlock()
+
+	if _, ok := hub.clients[client]; ok {
+		client.conn.Close()
+		delete(hub.clients, client)
 	}
+}
+
+func (hub *Hub) ServeWebsocket(writer http.ResponseWriter, request *http.Request) {
+	conn, err := config.Upgrader.Upgrade(writer, request, nil)
+	if err != nil {
+		log.Println("failed to upgrade websocet:", err)
+	}
+
+	client := NewClient(conn, hub)
+	hub.AddClient(client)
+
+	go client.WriteMessages()
+	go client.ReadMessages()
 }

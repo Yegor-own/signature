@@ -1,99 +1,45 @@
 package entity
 
 import (
-	"bytes"
-	"github.com/Yegor-own/signature/config"
-	"github.com/gorilla/websocket"
+	"fmt"
 	"log"
-	"net/http"
-	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 type Client struct {
-	hub  *Hub
 	conn *websocket.Conn
-	send chan []byte
+	hub  *Hub
 }
 
-func (c *Client) readPump() {
-	defer func() {
-		c.hub.unregister <- c
-		c.conn.Close()
-	}()
-
-	c.conn.SetReadLimit(config.MaxMessageSize)
-	c.conn.SetReadDeadline(time.Now().Add(config.ReadWait))
-	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(config.ReadWait))
-		return nil
-	})
-
-	for {
-		_, message, err := c.conn.ReadMessage()
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v", err)
-			}
-			break
-		}
-		message = bytes.TrimSpace(bytes.Replace(message, config.NewLine, config.Space, -1))
-		c.hub.broadcast <- message
+func NewClient(conn *websocket.Conn, hub *Hub) *Client {
+	return &Client{
+		conn: conn,
+		hub:  hub,
 	}
 }
 
-func (c *Client) writePump() {
-	ticker := time.NewTicker(config.PingPerioud)
-	defer func() {
-		ticker.Stop()
-		c.conn.Close()
-	}()
+func (client *Client) ReadMessages() {
+	for {
+		_, msg, err := client.conn.ReadMessage()
+		if err != nil {
+			log.Println("failed to read from ws:", err)
+		}
+		fmt.Println(msg)
+		client.hub.broadcast <- msg
+	}
+}
 
+func (client *Client) WriteMessages() {
 	for {
 		select {
-		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(config.WriteWait))
+		case msg, ok := <-client.hub.broadcast:
 			if !ok {
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
-				return
+				log.Println("broadcast reading fail")
 			}
-			writeConn, err := c.conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				return
-			}
-			writeConn.Write(message)
-
-			n := len(c.send)
-			for i := 0; i < n; i++ {
-				writeConn.Write(config.NewLine)
-				writeConn.Write(<-c.send)
-			}
-
-			if err = writeConn.Close(); err != nil {
-				return
-			}
-		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(config.WriteWait))
-			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				return
+			if err := client.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+				log.Println("wrting message fail:", err)
 			}
 		}
 	}
-}
-
-func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
-	conn, err := config.Upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	client := &Client{
-		hub:  hub,
-		conn: conn,
-		send: make(chan []byte, 256),
-	}
-
-	client.hub.register <- client
-
-	go client.writePump()
-	go client.readPump()
 }
