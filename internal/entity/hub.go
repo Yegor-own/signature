@@ -26,6 +26,7 @@ func (hub *Hub) AddClient(client *Client) {
 	defer hub.Unlock()
 
 	hub.clients[client] = true
+	log.Println("new client")
 }
 
 func (hub *Hub) DeleteClient(client *Client) {
@@ -39,14 +40,18 @@ func (hub *Hub) DeleteClient(client *Client) {
 }
 
 func (hub *Hub) ServeWebsocket(writer http.ResponseWriter, request *http.Request) {
-	conn, err := config.Upgrader.Upgrade(writer, request, nil)
+	log.Println("new connection")
+
+	conn, err := config.WSUpgrader.Upgrade(writer, request, nil)
+	// defer conn.Close()
 	if err != nil {
 		log.Println("failed to upgrade websocet:", err)
+		return
 	}
 
 	client := NewClient(conn, hub)
 	hub.AddClient(client)
 
-	go client.WriteMessages()
 	go client.ReadMessages()
+	go client.WriteMessages()
 }

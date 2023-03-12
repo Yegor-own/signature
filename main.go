@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -8,9 +9,12 @@ import (
 )
 
 func main() {
+
 	hub := entity.NewHub()
-	http.Handle("/", http.FileServer(http.Dir("./static/templates")))
+	http.Handle("/", http.FileServer(http.Dir("./static")))
 	http.HandleFunc("/ws", hub.ServeWebsocket)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
+
+	fmt.Println("hi")
 }

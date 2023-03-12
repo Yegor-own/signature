@@ -8,5 +8,6 @@ clear-build:
 	rm -rf build
 
 run:
+	make clear-build
 	make build
 	./build/bin/signature
